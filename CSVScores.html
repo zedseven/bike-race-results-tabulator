@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang='en'>
+	<head>
+		<title>CSV Test</title>
+		<meta name='author' content='Zacchary Dempsey-Plante' />
+		<meta charset='utf-8' />
+		<style type='text/css'>
+			table, th, td {
+				border: 1px solid #000000;
+			}
+			.dispTable {
+				display: inline-block;
+				margin: 0.2em;
+				vertical-align: top;
+			}
+		</style>
+	</head>
+	<body>
+		<div id='inputDiv'>
+			<label for='pointValues'>Position Point Values: </label><input id='pointValues' type='text' placeholder='Position Point Values (comma separated)' value='25,23,21,19,17,15,13,11,9,7,5,4,3,2,1' style='width: 30em;' />&nbsp;
+			<input id='fileUpload' type='file' accept='.csv' />
+			<button id='processButton'>Process</button>
+		</div>
+		<hr />
+		<div id='displayDiv'></div>
+		<script type='text/javascript'>
+			var startRow = 1;
+			var raceCol = 0;
+			var posCol = 1;
+			var categoryCol = 6;
+			var teamCol = 5;
+			var fnameCol = 4;
+			var lnameCol = 3;
+			var bibCol = 2;
+			var posPointsArr = new Array(25, 23, 21, 19, 17, 15, 13, 11, 9, 7, 5, 4, 3, 2, 1);
+			if(window.File && window.FileReader && window.FileList && window.Blob && window.Math) {
+				function processFile() {
+					var file = document.getElementById('fileUpload').files[0];
+					console.log('File selected: ' + file.name + ', ' + file.size + 'B');
+					if(file.name.endsWith('.csv')) {
+						//Replace the button with a 'Refresh' button to prevent double-processing
+						var pvAttr = document.createAttribute('disabled'); pvAttr.value = 'disabled'; document.getElementById('pointValues').setAttributeNode(pvAttr);
+						document.getElementById('fileUpload').style.display = 'none';
+						document.getElementById('processButton').style.display = 'none';
+						var refreshContainer = document.createElement('div');
+						refreshContainer.innerHTML = '<input id=\'refreshPage\' type=\'button\' value=\'Refresh\' onclick=\'location.reload();\' />';
+						document.getElementById('inputDiv').appendChild(refreshContainer.firstChild);
+						
+						var reader = new FileReader();
+						
+						reader.onload = (function(fileLoad) {
+							return function(e) {
+								displayData(processData(parseCSV(e.target.result)));
+							};
+						})(file);
+						
+						reader.readAsText(file, 'UTF-8');
+					}
+					else {
+						alert('The file must be a \'.csv\' file.');
+					}
+				}
+				function parseCSV(raw) {
+					var lines = raw.split('\n');
+					var out = new Array();
+					var colCount = -1;
+					for(var y = 0; y < lines.length; y++) {
+						var line = lines[y]/*.toLowerCase()*/.split(',');
+						if(colCount < 0) {
+							colCount = line.length;
+						}
+						if(line.length == colCount) {
+							for(var x = 0; x < line.length; x++) {
+								line[x] = line[x].trim();
+								if(!isNaN(parseFloat(line[x]))) {
+									line[x] = parseFloat(line[x]);
+								}
+							}
+							out.push(line);
+						}
+						else {
+							console.log('Line \'' + lines[y] + '\' will be discarded because it contains an incorrect number of columns: ' + line.length);
+						}
+					}
+					return out;
+				}
+				function processData(dat) {
+					console.log(dat);
+					
+					var tPosPointsArr = document.getElementById('pointValues').value.split(',');
+					posPointsArr = new Array();
+					for(var i = 0; i < tPosPointsArr.length; i++) {
+						if(!isNaN(tPosPointsArr[i].trim())) {
+							posPointsArr.push(parseInt(tPosPointsArr[i].trim()));
+						}
+					}
+					console.log(posPointsArr);
+					
+					var categoryData = new Array();
+					
+					//Gather all data from the table into category > school > racer
+					var categoriesTemp = new Array(); //Inefficient, but only way to keep an easy index of which categories are stored already
+					var categorySchoolsTemp = new Array();
+					for(var y = 0; y < dat.length; y++) {
+						if(y >= startRow) {
+							if(Array.isArray(dat[y])) {
+								if(categoriesTemp.indexOf(dat[y][categoryCol].toLowerCase()) > -1) {
+									for(var i = 0; i < categoryData.length; i++) {
+										if(categoryData[i].name == dat[y][categoryCol]) {
+											console.log(categoryData[i].name);
+											console.log(dat[y][categoryCol]);
+											//categoryData[i].rows.push(y);
+											
+											if(categorySchoolsTemp[i].indexOf(dat[y][teamCol].toLowerCase()) > -1) {
+												for(var l = 0; l < categoryData[i].schools.length; l++) {
+													if(categoryData[i].schools[l].name == dat[y][teamCol]) {
+														if(categoryData[i].schools[l].races.length >= dat[y][raceCol]) {
+															categoryData[i].schools[l].races[dat[y][raceCol] - 1].push(y);
+														}
+														else {
+															categoryData[i].schools[l].races.push(new Array());
+															categoryData[i].schools[l].races[categoryData[i].schools[l].races.length - 1].push(y);
+														}
+														
+														break;
+													}
+												}
+											}
+											else {
+												categoryData[i].schools.push({ name : dat[y][teamCol], races : new Array(), racers : new Array(), total : 0 });
+												categoryData[i].schools[categoryData[i].schools.length - 1].races.push(new Array());
+												categoryData[i].schools[categoryData[i].schools.length - 1].races[categoryData[i].schools[categoryData[i].schools.length - 1].races.length - 1].push(y);
+												categorySchoolsTemp[i].push(dat[y][teamCol].toLowerCase());
+											}
+											
+											break;
+										}
+									}
+								}
+								else {
+									categoryData.push({ name : dat[y][categoryCol], schools : new Array() });
+									categoryData[categoryData.length - 1].schools.push({ name : dat[y][teamCol], races : new Array(), racers : new Array(), total : 0 });
+									categoryData[categoryData.length - 1].schools[categoryData[categoryData.length - 1].schools.length - 1].races.push(new Array());
+									categoryData[categoryData.length - 1].schools[categoryData[categoryData.length - 1].schools.length - 1].races[categoryData[categoryData.length - 1].schools[categoryData[categoryData.length - 1].schools.length - 1].races.length - 1].push(y);
+									categoriesTemp.push(dat[y][categoryCol].toLowerCase());
+									categorySchoolsTemp.push(new Array());
+									categorySchoolsTemp[categorySchoolsTemp.length - 1].push(dat[y][teamCol].toLowerCase());
+								}
+							}
+						}
+					}
+					
+					console.log(categoriesTemp);
+					console.log(categorySchoolsTemp);
+					
+					//Calculate point totals
+					for(var c = 0; c < categoryData.length; c++) {
+						console.log('Category: ' + categoryData[c].name);
+						for(var s = 0; s < categoryData[c].schools.length; s++) {
+							console.log('School: ' + categoryData[c].schools[s].name);
+							var racerTotalOrder = new Array();
+							var racersTemp = new Array();
+							for(var r = 0; r < categoryData[c].schools[s].races.length; r++) {
+								console.log('Race: ' + (r + 1));
+								for(var p = 0; p < categoryData[c].schools[s].races[r].length; p++) {
+									console.log('Racer: #' + dat[categoryData[c].schools[s].races[r][p]][bibCol] + ' ' + dat[categoryData[c].schools[s].races[r][p]][fnameCol] + ' ' + dat[categoryData[c].schools[s].races[r][p]][lnameCol] + ' with a position of ' + dat[categoryData[c].schools[s].races[r][p]][posCol]);
+									if(racersTemp.indexOf(dat[categoryData[c].schools[s].races[r][p]][bibCol]) > -1) {
+										for(var o = 0; o < categoryData[c].schools[s].racers.length; o++) {
+											if(categoryData[c].schools[s].racers[o].bib == dat[categoryData[c].schools[s].races[r][p]][bibCol]) {
+												categoryData[c].schools[s].racers[o].total += awardPoints(dat[categoryData[c].schools[s].races[r][p]][posCol]);
+											}
+											
+											break;
+										}
+									}
+									else {
+										categoryData[c].schools[s].racers.push({ fname : dat[categoryData[c].schools[s].races[r][p]][fnameCol], lname : dat[categoryData[c].schools[s].races[r][p]][lnameCol], bib : dat[categoryData[c].schools[s].races[r][p]][bibCol], total : awardPoints(dat[categoryData[c].schools[s].races[r][p]][posCol]) });
+										racersTemp.push(dat[categoryData[c].schools[s].races[r][p]][bibCol]);
+									}
+								}
+							}
+							for(var o = 0; o < categoryData[c].schools[s].racers.length; o++) {
+								racerTotalOrder.push(categoryData[c].schools[s].racers[o].total);
+							}
+							racerTotalOrder.sort(function(a, b) {
+									return b - a;
+								});
+							//racerTotalOrder = racerTotalOrder.reverse();
+							console.log(racerTotalOrder);
+							for(var p = 0; p < Math.min(racerTotalOrder.length, 4); p++) {
+								console.log(categoryData[c].schools[s].total);
+								categoryData[c].schools[s].total += racerTotalOrder[p];
+							}
+						}
+						categoryData[c].schools.sort(function(a, b) {
+								return b.total - a.total;
+							});
+					}
+					
+					console.log(categoryData);
+					return categoryData;
+				}
+				function displayData(dat) {
+					var disp = document.getElementById('displayDiv');
+					disp.innerHTML += '<h2>Schools</h2>';
+					var out = '';
+					for(var c = 0; c < dat.length; c++) {
+						out += '<table class=\'dispTable\'><tr><th colspan=\'100%\'>' + dat[c].name + '</th></tr><tr><th>School</th><th>Total</th></tr>';
+						for(var s = 0; s < dat[c].schools.length; s++) {
+							out += '<tr><td>' + dat[c].schools[s].name + '</td><td>' + dat[c].schools[s].total + '</td></tr>';
+						}
+						out += '</table>';
+					}
+					disp.innerHTML += out;
+					disp.innerHTML += '<br />';
+					disp.innerHTML += '<h2>Racers</h2>';
+					var out = '';
+					for(var c = 0; c < dat.length; c++) {
+						var racersTemp = new Array();
+						for(var s = 0; s < dat[c].schools.length; s++) {
+							for(var r = 0; r < dat[c].schools[s].racers.length; r++) {
+								racersTemp.push({ name : dat[c].schools[s].racers[r].fname + ' ' + dat[c].schools[s].racers[r].lname, bib : dat[c].schools[s].racers[r].bib, school : dat[c].schools[s].name, total : dat[c].schools[s].racers[r].total });
+							}
+						}
+						racersTemp.sort(function(a, b) {
+								return b.total - a.total;
+							});
+						out += '<table class=\'dispTable\'><tr><th colspan=\'100%\'>' + dat[c].name + '</th></tr><tr><th>Racer</th><th>Bib #</th><th>School</th><th>Total</th></tr>';
+						for(var r = 0; r < racersTemp.length; r++) {
+							out += '<tr><td>' + racersTemp[r].name + '</td><td>' + racersTemp[r].bib + '</td><td>' + racersTemp[r].school + '</td><td>' + racersTemp[r].total + '</td></tr>';
+						}
+						out += '</table>';
+					}
+					disp.innerHTML += out;
+				}
+				function awardPoints(pos) {
+					if(!isNaN(pos)) {
+						if(pos <= posPointsArr.length && pos > 0) {
+							return posPointsArr[pos - 1];
+						}
+						else {
+							return 1;
+						}
+					}
+					else if(pos.toLowerCase() == 'dnf') {
+						return 1;
+					}
+					return 0;
+				}
+				function capitalize(str) {
+					var arr = str.split(' ');
+					for(var i = 0; i < arr.length; i++) {
+						arr[i] = arr[i][0].toUpperCase() + arr[i].substr(1);
+					}
+					return arr.join(' ');
+				}
+				document.getElementById('processButton').addEventListener('click', processFile, false);
+			}
+			else {
+				alert('This browser does not adequately support the required APIs. Please try to use a more up-to-date one.');
+			}
+		</script>
+	</body>
+</html>

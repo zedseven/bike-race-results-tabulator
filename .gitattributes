@@ -1,0 +1,2 @@
+# This is because at the time the project was designed to be a singular file, and so the HTML is just a thin shell over mostly JS code
+CSVScores.html linguist-language=JavaScript
